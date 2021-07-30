@@ -207,13 +207,13 @@ def menu():
     while True:
         if fun_menu in ['1', '2']:
             source_host = input("source ip (127.0.0.1):") or "127.0.0.1"
-            source_db = input("source dbname (testgg):") or "testgg"
+            source_db = input("source dbname (trinity):") or "trinity"
             source_user = input("source user (trinity):") or "trinity"
             source_pwd = input("source password (trinity):") or "trinity"
             source_port = input("source port (5432):") or "5432"
 
             target_host = input("target ip (127.0.0.1):") or "127.0.0.1"
-            target_db = input("target dbname (trinity_test):") or "trinity_test"
+            target_db = input("target dbname (trinity):") or "trinity"
             target_user = input("target user (trinity):") or "trinity"
             target_pwd = input("target password (trinity):") or "trinity"
             target_port = input("target port (5432):") or "5432"
