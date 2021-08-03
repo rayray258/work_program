@@ -26,12 +26,12 @@ def cptable(source_conn_set, target_conn_set, pg_size, table_name):
     source_conn = psycopg2.connect(**s_connectparams)
     source_cur = source_conn.cursor()
     try:
+        source_cur.execute("select * from {0};".format(table_name))
         # truncate tgt table
         truncate_extra_table(target_conn_set, table_name)
         tgt_cur.execute("truncate table {0};".format(table_name))
         tgt_conn.commit()
         print('truncate table {0};'.format(table_name))
-        source_cur.execute("select * from {0};".format(table_name))
         insert_count = 0
         print('copy table {0} begin'.format(table_name))
 
@@ -169,10 +169,7 @@ def clear_null(target_conn_set):
     t_connectparams = dict(entry.split('=') for entry in target_conn_set.split(','))
     tgt_conn = psycopg2.connect(**t_connectparams)
     tgt_cur = tgt_conn.cursor()
-    # key 3rd
-    tgt_cur.execute("UPDATE trinityconfig SET versionid = '4.1.1';")
-    tgt_cur.execute("INSERT INTO public.disconfig VALUES ('lc', 'np.type', '1', '') "
-                    "ON CONFLICT ON CONSTRAINT disconfig_pkey DO NOTHING;")
+
     # clear null
     tgt_cur.execute("UPDATE public.jobexecution SET holidayuid = '', conflictrule = '0' WHERE holidayuid IS NULL;")
     tgt_cur.execute("UPDATE public.frequency SET wcalendaruid = '' WHERE wcalendaruid IS NULL;")
@@ -201,7 +198,7 @@ def clear_null(target_conn_set):
 
 
 def menu():
-    print('copy data version:2.0.0')
+    print('copy data version:2.0.1')
     fun_menu = input("Update:1\nCopy log:2\nCustom mode:0\nselect function:")
     table_list = []
     global error_table
@@ -260,7 +257,10 @@ def menu():
                               'metareportnotificationlist', 'metatable', 'metatablelayout', 'metatablelayouthistory',
                               'metatabletxdate', 'mutex', 'mutexcategory', 'mutexjob', 'mutexrelation', 'notification',
                               'notificationlist', 'objectalias', 'plugin', 'plugincategory', 'plugincategorylist',
-                              'pluginlicense', 'pluginproperty', 'usergroup', 'workingcalendar', 'workingcalendarlist']
+                              'pluginlicense', 'pluginproperty', 'usergroup', 'workingcalendar', 'workingcalendarlist',
+                              'frequencyschedule', 'jobalert', 'jobalertversion', 'jobexecutionschedule',
+                              'jobexecutionversion', 'jobstatistic', 'jobvariable', 'jobvariableversion'
+                              ]
             elif fun_menu == '2':
                 table_list = ['task', 'tasklog', 'taskjoblog', 'tasksteplog', 'receivefilelog', 'taskstepfulllog',
                               'taskstepoutputlog', 'taskstatusreasonhistory']
@@ -273,11 +273,37 @@ def menu():
                     error_table_list.append(error_table)
                     error_table = None
                     continue
+            # last update
             if fun_menu == '1':
+                t_connectparams = dict(entry.split('=') for entry in target_conn_set.split(','))
+                tgt_conn = psycopg2.connect(**t_connectparams)
+                tgt_cur = tgt_conn.cursor()
+                # key 3rd
+                tgt_cur.execute("UPDATE trinityconfig SET versionid = '4.1.1';")
+                tgt_cur.execute("INSERT INTO public.disconfig VALUES ('lc', 'np.type', '1', '') "
+                                "ON CONFLICT ON CONSTRAINT disconfig_pkey DO NOTHING;")
+                tgt_cur.execute("truncate table primaryjcsqueue")
+                tgt_cur.execute("truncate table primarytaskqueue")
+                tgt_cur.execute("truncate table standbyjcsqueue")
+                tgt_cur.execute("truncate table standbytaskqueue")
+                tgt_cur.execute("truncate table standbyoutputqueue")
+                tgt_cur.execute("truncate table taskconsolequeue")
+                tgt_cur.execute("truncate table disfulltextsearchqueue")
+
+                tgt_conn.commit()
+                tgt_cur.close()
+                tgt_conn.close()
                 clear_null(target_conn_set)
             else:
                 pass
             print('error table {0}'.format(error_table_list))
+            not_exist = ['frequencyschedule', 'jobalert', 'jobalertversion', 'jobexecutionschedule',
+                         'jobexecutionversion', 'jobstatistic', 'jobvariable', 'jobvariableversion']
+            if error_table_list == not_exist:
+                print('4.0 source db does not exist these table')
+            else:
+                pass
+
             break
         elif fun_menu == '0':
             source_host = input("source ip (127.0.0.1):") or "127.0.0.1"
@@ -317,7 +343,6 @@ def menu():
             break
         else:
             continue
-
     input("Please press the Enter key to proceed")
 
 
