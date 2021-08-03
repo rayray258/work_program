@@ -394,14 +394,27 @@ def menu():
                 pass
 
             break
-        elif fun_menu == '0':
-            input_list = input_values()
-            source_conn_set = input_list[0]
-            target_conn_set = input_list[1]
-            pg_size = input_list[2]
+        elif fun_menu in ['0', '0-cfg']:
+            if fun_menu == ['0']:
+                input_list = input_values()
+                source_conn_set = input_list[0]
+                target_conn_set = input_list[1]
+                pg_size = input_list[2]
+            else:
+                conf_list = conf_mode()
+                source_conn_set = conf_list[0]
+                target_conn_set = conf_list[1]
+                pg_size = conf_list[2]
+
             u_table = input("enter table:")
             table_list = u_table.split(',')
             print(table_list)
+            while True:
+                yes = input('enter (y/yes) contunue:')
+                if yes in ['y', 'yes']:
+                    break
+                else:
+                    continue
             # run copy
             for table_name in table_list:
                 cptable(source_conn_set, target_conn_set, pg_size, table_name)
