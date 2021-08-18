@@ -22,7 +22,7 @@ def delete_du(conn_set, db_table, table_pk):
             #             "from {0} where {1}='{2}'" .format(db_table, table_pk, delete_query[0]))
             cur.execute("delete from {0} "
                         "where {1}='{2}' "
-                        "and ctid=(select max(ctid) "
+                        "and ctid not in (select max(ctid) "
                         "from {0} where {1}='{2}')" .format(db_table, table_pk, delete_query[0]))
             count += 1
             print("Table:{0} duplicate_key:{1} {2}/{3}".format(db_table, delete_query[0], count, rowcount))
