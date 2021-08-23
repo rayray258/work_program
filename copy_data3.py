@@ -131,7 +131,29 @@ def cptable(source_conn_set, target_conn_set, pg_size, table_name):
     source_conn = psycopg2.connect(**s_connectparams)
     source_cur = source_conn.cursor()
     try:
-        source_cur.execute("select * from {0};".format(table_name))
+        if table_name in ['taskstepfulllog', 'tasksteplog', 'taskstepoutputlog']:
+            source_cur.execute("select distinct on (tasksteploguid) * from {0};".format(table_name))
+        elif table_name == 'tasklog':
+            source_cur.execute("select distinct on (taskuid) * from {0};".format(table_name))
+        elif table_name == 'taskjoblog':
+            source_cur.execute("select distinct on (taskjobloguid) * from {0};".format(table_name))
+        elif table_name == 'receivefilelog':
+            source_cur.execute("select distinct on (receivefileloguid) * from {0};".format(table_name))
+        elif table_name == 'taskstatusreasonhistory':
+            source_cur.execute("select distinct on (seq) * from {0};".format(table_name))
+        elif table_name == 'disconfig':
+            tgt_cur.execute("select count(*) from pg_tables where schemaname='public' and "
+                            "tablename='disconfig_installtmp';")
+            tgt_results = tgt_cur.fetchone()[0]
+            if tgt_results == 0:
+                tgt_cur.execute("select * into public.disconfig_installtmp from public.disconfig;")
+                tgt_conn.commit()
+                source_cur.execute("select * from {0};".format(table_name))
+            else:
+                source_cur.execute("select * from {0};".format(table_name))
+                pass
+        else:
+            source_cur.execute("select * from {0};".format(table_name))
         # truncate tgt table
         truncate_extra_table(target_conn_set, table_name)
         tgt_cur.execute("truncate table {0};".format(table_name))
@@ -154,11 +176,18 @@ def cptable(source_conn_set, target_conn_set, pg_size, table_name):
             else:
                 pass
             insert_count += 50000
+
             insert_query = "insert into {0} values %s ".format(table_name)
             # insert into target
             extras.execute_values(tgt_cur, insert_query, source_results, page_size=int(pg_size), fetch=False)
 
             # print('copy table {0} finsh'.format(table_name))
+        if table_name == 'disconfig':
+            tgt_cur.execute("insert into public.disconfig select * from public.disconfig_installtmp "
+                            "ON CONFLICT ON CONSTRAINT disconfig_pkey DO NOTHING;")
+            tgt_conn.commit()
+        else:
+            pass
 
         source_conn.commit()
         source_cur.close()
@@ -303,7 +332,7 @@ def clear_null(target_conn_set):
 
 
 def menu():
-    print('copy data version:3.0.0')
+    print('copy data version:3.1.0')
     fun_menu = input("Update:1\nCopy log:2\nCustom mode:0\nselect function:")
     table_list = []
     global error_table
@@ -323,7 +352,8 @@ def menu():
                 pg_size = conf_list[2]
 
             if fun_menu in ['1', '1-cfg']:
-                table_list = ['auditing', 'busentityvariable', 'busentitycategory', 'connection', 'connectioncategory',
+                table_list = ['busentity', 'disconfig', 'domain', 'role', 'trinityuser', 'accessright',
+                              'auditing', 'busentityvariable', 'busentitycategory', 'connection', 'connectioncategory',
                               'connectionlibprop', 'connectionlibref', 'connectionrelation', 'dmextjar', 'dmextpackage',
                               'dmextrule', 'domainresource', 'domainvariable', 'excludefrequency',
                               'excludefrequencylist', 'filesource', 'filesourcecategory', 'filesourcerelation',
@@ -342,7 +372,8 @@ def menu():
                               'notificationlist', 'objectalias', 'plugin', 'plugincategory', 'plugincategorylist',
                               'pluginlicense', 'pluginproperty', 'usergroup', 'workingcalendar', 'workingcalendarlist',
                               'frequencyschedule', 'jobalert', 'jobalertversion', 'jobexecutionschedule',
-                              'jobexecutionversion', 'jobstatistic', 'jobvariable', 'jobvariableversion'
+                              'jobexecutionversion', 'jobstatistic', 'jobvariable', 'jobvariableversion',
+                              'maskclass', 'tokenclass', 'encryptclass'
                               ]
             elif fun_menu in ['2', '2-cfg']:
                 table_list = ['task', 'tasklog', 'taskjoblog', 'tasksteplog', 'receivefilelog', 'taskstepfulllog',
@@ -368,9 +399,13 @@ def menu():
                 tgt_conn = psycopg2.connect(**t_connectparams)
                 tgt_cur = tgt_conn.cursor()
                 # key 3rd
-                tgt_cur.execute("UPDATE trinityconfig SET versionid = '4.1.1';")
-                tgt_cur.execute("INSERT INTO public.disconfig VALUES ('lc', 'np.type', '1', '') "
-                                "ON CONFLICT ON CONSTRAINT disconfig_pkey DO NOTHING;")
+                # tgt_cur.execute("UPDATE trinityconfig SET versionid = '4.1.1';")
+                # tgt_cur.execute("INSERT INTO public.disconfig VALUES ('lc', 'np.type', '1', '') "
+                #                 "ON CONFLICT ON CONSTRAINT disconfig_pkey DO NOTHING;")
+                tgt_cur.execute("update disconfig set value="
+                                "(select value from disconfig_installtmp "
+                                "where module='server' and configname='serverIP')"
+                                "where module='server' and configname='serverIP'")
                 tgt_cur.execute("truncate table primaryjcsqueue")
                 tgt_cur.execute("truncate table primarytaskqueue")
                 tgt_cur.execute("truncate table standbyjcsqueue")
@@ -395,7 +430,7 @@ def menu():
 
             break
         elif fun_menu in ['0', '0-cfg']:
-            if fun_menu == ['0']:
+            if fun_menu == '0':
                 input_list = input_values()
                 source_conn_set = input_list[0]
                 target_conn_set = input_list[1]
